@@ -18,6 +18,7 @@ import { GetAllMoviesUseCase } from './services/movies/GetAllMoviesUseCase.js'
 import { GetMovieUseCase } from './services/movies/GetMovieUseCase.js'
 import { CreateMovieUseCase } from './services/movies/CreateMovieUseCase.js'
 import { UpdateMovieUseCase } from './services/movies/UpdateMovieUseCase.js'
+import { DeleteMovieUseCase } from './services/movies/DeleteMovieUseCase.js'
 import { MoviesController } from './controllers/MoviesController.js'
 import { createsMovieRouter } from './routes/movies.routes.js'
 
@@ -52,9 +53,10 @@ export const createApp = ({ userRepository, moviesRepository }) => {
   const getMovieUseCase = new GetMovieUseCase({ moviesRepository })
   const createMovieUseCase = new CreateMovieUseCase({ moviesRepository, idGenerator })
   const updateMovieUseCase = new UpdateMovieUseCase({ moviesRepository })
+  const deleteMovieUseCase = new DeleteMovieUseCase({ moviesRepository })
 
   // Movies controllers
-  const moviesController = new MoviesController({ getAllMoviesUseCase, getMovieUseCase, createMovieUseCase, updateMovieUseCase })
+  const moviesController = new MoviesController({ getAllMoviesUseCase, getMovieUseCase, createMovieUseCase, updateMovieUseCase, deleteMovieUseCase })
   const moviesRouter = createsMovieRouter({ moviesController, authMiddleware })
 
   app.get('/', (req, res) => {
