@@ -19,17 +19,72 @@ const db = createClient({
 
 export class MoviesRepository extends MoviesRepositoryInterface {
   async init () {
-    await db.execute(`
-        CREATE TABLE IF NOT EXISTS movies (
-        id TEXT PRIMARY KEY,
-        title TEXT NOT NULL UNIQUE,
-        year INTEGER NOT NULL,
-        director TEXT NOT NULL,
-        duration INTEGER NOT NULL,
-        poster TEXT,
-        rate REAL NOT NULL CHECK (rate >= 0 AND rate <= 10.0)
-      );
-    `)
+    await db.batch([
+      { sql: 'PRAGMA foreign_keys = ON; -- Activa claves foráneas' },
+      { sql: 'DROP TABLE IF EXISTS movies;' },
+      {
+        sql: `
+        CREATE TABLE movies (
+          id TEXT PRIMARY KEY,
+          title TEXT NOT NULL,
+          year INTEGER NOT NULL,
+          director TEXT NOT NULL,
+          duration INTEGER NOT NULL,
+          poster TEXT,
+          rate REAL NOT NULL CHECK (rate >= 0 AND rate <= 10.0)
+        );`
+      },
+      { sql: 'DROP TABLE IF EXISTS genres;' },
+      {
+        sql: `
+        CREATE TABLE genres (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL UNIQUE
+        );`
+      },
+      { sql: 'DROP TABLE IF EXISTS movies_genres;' },
+      {
+        sql: `
+        CREATE TABLE movies_genres (
+          movie_id TEXT NOT NULL,
+          genre_id INTEGER,
+          PRIMARY KEY (movie_id, genre_id),
+          FOREIGN KEY (movie_id) REFERENCES movies(id) ON DELETE CASCADE,
+          FOREIGN KEY (genre_id) REFERENCES genres(id) ON DELETE SET NULL
+        );`
+      },
+      {
+        sql: `
+        INSERT INTO movies (id, title, year, director, duration, poster, rate) VALUES
+        ('0695d6bd-47ec-11f1-b23d-000e0986bd5b', 'Inception', 2010, 'Christopher Nolan', 148, 'https://m.media-amazon.com/images/I/91Rc8cAmnAL._AC_UF1000,1000_QL80_.jpg', 8.8),
+        ('0695da61-47ec-11f1-b23d-000e0986bd5b', 'The Shawshank Redemption', 1994, 'Frank Darabont', 142, 'https://i.ebayimg.com/images/g/4goAAOSwMyBe7hnQ/s-l1200.webp', 9.3),
+        ('0695db17-47ec-11f1-b23d-000e0986bd5b', 'The Dark Knight', 2008, 'Christopher Nolan', 152, 'https://i.ebayimg.com/images/g/yokAAOSw8w1YARbm/s-l1200.jpg', 9.0);
+        `
+      },
+      {
+        sql: `
+        INSERT INTO genres (name) VALUES
+        ('Drama'),
+        ('Action'),
+        ('Crime'),
+        ('Adventure'),
+        ('Sci-Fi'),
+        ('Romance');
+        `
+      },
+      {
+        sql: `
+        INSERT INTO movies_genres (movie_id, genre_id)
+        VALUES
+            ((SELECT id FROM movies WHERE title = 'Inception'), (SELECT id FROM genres WHERE name = 'Action')),
+            ((SELECT id FROM movies WHERE title = 'Inception'), (SELECT id FROM genres WHERE name = 'Adventure')),
+            ((SELECT id FROM movies WHERE title = 'Inception'), (SELECT id FROM genres WHERE name = 'Sci-Fi')),
+            ((SELECT id FROM movies WHERE title = 'The Shawshank Redemption'), (SELECT id FROM genres WHERE name = 'Drama')),
+            ((SELECT id FROM movies WHERE title = 'The Dark Knight'), (SELECT id FROM genres WHERE name = 'Action')),
+            ((SELECT id FROM movies WHERE title = 'The Dark Knight'), (SELECT id FROM genres WHERE name = 'Crime')),
+            ((SELECT id FROM movies WHERE title = 'The Dark Knight'), (SELECT id FROM genres WHERE name = 'Drama'));`
+      }
+    ], 'write')
   }
 
   async getAll ({ genres }) {
@@ -216,6 +271,13 @@ export class MoviesRepository extends MoviesRepositoryInterface {
   }
 
   async delete (id) {
-    throw new Error('Method not immplemented')
+    try {
+      await db.execute({
+        sql: 'DELETE FROM movies WHERE id = ?;',
+        args: [id]
+      })
+    } catch (error) {
+      console.error('Error deleting movie in repository.')
+    }
   }
 }
