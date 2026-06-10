@@ -42,11 +42,10 @@ export class MoviesController {
     const { genres } = result.data
     try {
       const movieResult = await this.createMovieUseCase.execute({ title, year, director, duration, poster, rate, genres })
-      if (!movieResult || movieResult.length === 0) return res.status(404).json({ message: 'Movie could not be created' })
+      if (!movieResult || movieResult.length === 0) return res.status(404).json({ message: 'createMoviesUseCase returned null or empty array' })
       return res.status(201).json(movieResult)
     } catch (error) {
-      console.error('A movie with this title already exists')
-      return res.status(409).json(error.message)
+      return res.status(409).json({ error: error.message })
     }
   }
 
@@ -67,8 +66,12 @@ export class MoviesController {
   }
 
   delete = async (req, res, next) => {
-    const { id } = req.parmas
-    await this.deleteMovieUseCase(id)
-    return res.status(204).JSON({ message: 'Movie deleted successfully' })
+    const { id } = req.params
+    try {
+      await this.deleteMovieUseCase.execute({ id })
+      return res.status(204)
+    } catch (error) {
+      return res.status(404).json({ message: `Movie with id ${id} was not found` })
+    }
   }
 }
