@@ -31,14 +31,24 @@ function rowToUser (row) {
 
 export class UserRepository extends UserRepositoryInterface {
   async init () {
-    await db.execute(`
-      CREATE TABLE IF NOT EXISTS users (
-        id TEXT PRIMARY KEY,
-        username TEXT NOT NULL UNIQUE,
-        password_hash TEXT NOT NULL,
-        email TEXT NOT NULL UNIQUE
-      );
-    `)
+    await db.batch([
+      { sql: 'DROP TABLE IF EXISTS users;' },
+      {
+        sql: `
+        CREATE TABLE users (
+          id TEXT PRIMARY KEY,
+          username TEXT NOT NULL UNIQUE,
+          password_hash TEXT NOT NULL,
+          email TEXT NOT NULL UNIQUE
+        );
+      `
+      },
+      {
+        sql: `INSERT INTO users (id, username, password_hash, email) 
+        VALUES
+        ('cd8b4fb4-6377-457a-800e-ff5d7a26e8bc' , 'usuario_prueba', '$2b$10$ZhMIBnpjNa71JqF840N5x.jhVHB8ot0ptsbTELPLZj9rcbIlIsgcO', 'usuario@prueba.com');`
+      }
+    ], 'write')
   }
 
   async findById (id) {
