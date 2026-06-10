@@ -7,7 +7,7 @@ export function createsMovieRouter ({ moviesController, authMiddleware }) {
   moviesRouter.get('/:id', moviesController.getById)
   moviesRouter.post('/', authMiddleware, moviesController.create)
   moviesRouter.patch('/:id', authMiddleware, moviesController.update)
-  // moviesRouter.delete('/:id', authMiddleware, moviesController.delete)
+  moviesRouter.delete('/:id', authMiddleware, moviesController.delete)
 
   return moviesRouter
 }
