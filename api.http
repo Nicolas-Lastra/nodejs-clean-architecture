@@ -18,7 +18,7 @@ POST http://localhost:1234/auth/login
 Content-Type: application/json
 
 {
-    "username": "Usuario4",
+    "username": "usuario_prueba",
     "password": "123456"
 }
 
@@ -38,16 +38,16 @@ GET http://localhost:1234/movies?genres=Drama
 GET http://localhost:1234/movies?genres=Drama&genres=Crime
 
 ### Recuperar por id
-GET http://localhost:1234/movies/d866cc04-3d27-48b6-bc63-a896c8a11b9d
+GET http://localhost:1234/movies/0695db17-47ec-11f1-b23d-000e0986bd5b
 
 ### Crear película
 POST http://localhost:1234/movies/
 Content-Type: application/json
 
 {
-    "title": "Película de prueba 2",
+    "title": "Película de prueba",
     "year": 2010,
-    "director": "Nicolás Lastra",
+    "director": "Desconocido",
     "duration": 200,
     "poster": "https://i.ebayimg.com/images/g/yokAAOSw8w1YARbm/s-l1200.jpg",
     "rate": 0,
@@ -58,14 +58,17 @@ Content-Type: application/json
 }
 
 ### Update movie
-PATCH http://localhost:1234/movies/f7cac7bf-5f5f-452f-99e3-0b193065a74a
+PATCH http://localhost:1234/movies/7ddccb19-ade3-4fdb-9f94-128371ca5065
 Content-Type: application/json
 
 {
-    "title": "Película de prueba 2 v2",
+    "title": "Película de prueba v2",
     "year": 2026,
     "genres": [
         "Romance",
         "Sci-Fi"
     ]
 }
+
+### Delete movie
+DELETE http://localhost:1234/movies/d866cc04-3d27-48b6-bc63-a896c8a11b9d
