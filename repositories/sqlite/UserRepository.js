@@ -1,5 +1,5 @@
-import { User } from '../../models/User.js'
 import { UserRepositoryInterface } from '../../contracts/UserRepositoryInterface.js' // Interfaz: contrato que deben seguir los repositorios
+import { UserMapper } from '../../mappers/UserMapper.js'
 import { createClient } from '@libsql/client'
 
 // local file db
@@ -17,17 +17,6 @@ const db = createClient({
 // })
 
 // Recuerda crear el archivo .env en la raíz del proyecto
-
-function rowToUser (row) {
-  if (!row) return null
-
-  return new User({
-    id: row.id,
-    username: row.username,
-    passwordHash: row.password_hash,
-    email: row.email
-  })
-}
 
 export class UserRepository extends UserRepositoryInterface {
   async init () {
@@ -57,7 +46,7 @@ export class UserRepository extends UserRepositoryInterface {
       args: [id]
     })
 
-    const user = rowToUser(result.rows[0])
+    const user = UserMapper.toDomain(result.rows[0])
     return user ?? null
   }
 
@@ -67,12 +56,13 @@ export class UserRepository extends UserRepositoryInterface {
       args: [username]
     })
 
-    const user = rowToUser(result.rows[0])
+    const user = UserMapper.toDomain(result.rows[0])
     return user ?? null
   }
 
   async save (user) {
-    const { id, username, passwordHash, email } = user.toPrimitives()
+    const userData = UserMapper.toPersistance(user)
+    const { id, username, passwordHash, email } = userData
     await db.execute({
       sql: `INSERT INTO users (id, username, password_hash, email)
         VALUES (?, ?, ?, ?);

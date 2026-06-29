@@ -1,3 +1,4 @@
+import { UserMapper } from '../../mappers/UserMapper.js'
 import { User } from '../../models/User.js'
 
 export class RegisterUserUseCase {
@@ -23,6 +24,6 @@ export class RegisterUserUseCase {
 
     await this.userRepository.save(newUser)
 
-    return newUser.toPublicData()
+    return UserMapper.toPublicResponse(newUser)
   }
 }

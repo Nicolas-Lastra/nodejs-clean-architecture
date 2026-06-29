@@ -1,3 +1,5 @@
+import { UserMapper } from '../../mappers/UserMapper.js'
+
 export class LoginUserUseCase {
   constructor ({ userRepository, passwordHasher, tokenService }) {
     this.userRepository = userRepository
@@ -15,7 +17,7 @@ export class LoginUserUseCase {
     const accessToken = await this.tokenService.sign({ id: user.id, username: user.username })
 
     return {
-      user: user.toPublicData(),
+      user: UserMapper.toPublicResponse(user),
       accessToken
     }
   }
