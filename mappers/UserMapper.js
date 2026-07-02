@@ -12,21 +12,12 @@ export const UserMapper = {
     })
   },
 
-  toPersistance (user) {
+  toPersistence (user) {
     const userData = user.toPrimitives()
     return {
       id: userData.id,
       username: userData.username,
-      passwordHash: userData.passwordHash,
-      email: userData.email
-    }
-  },
-
-  toPublicResponse (user) {
-    const userData = user.toPublicData()
-    return {
-      id: userData.id,
-      username: userData.username,
+      password_hash: userData.passwordHash,
       email: userData.email
     }
   }
