@@ -11,9 +11,9 @@ export class CreateMovieUseCase {
     const movieExists = await this.moviesRepository.getByTitle(title)
     if (movieExists && movieExists.length > 0) throw new Error('A movie with this title already exists')
 
-    const movie = new Movie({ id, title, year, director, duration, poster, rate })
-    const createdMovieWithGenres = await this.moviesRepository.create(movie, genres)
+    const movie = new Movie({ id, title, year, director, duration, poster, rate, genres })
+    const createdMovie = await this.moviesRepository.create(movie)
 
-    return createdMovieWithGenres
+    return createdMovie
   }
 }
