@@ -1,4 +1,5 @@
 import { validateMovie, validatePartialMovie } from '../schemas/Movie.js'
+import { MoviePresenter } from '../presenters/MoviePresenter.js'
 
 export class MoviesController {
   constructor ({ getAllMoviesUseCase, getMovieUseCase, createMovieUseCase, updateMovieUseCase, deleteMovieUseCase }) {
@@ -10,8 +11,6 @@ export class MoviesController {
   }
 
   getAll = async (req, res, next) => {
-    // todo: checkear con esquema si genres es un array
-    // y si su contenido está predefinido en una tupla del esquema
     const genresResult = req.query.genres
     let genres
     if (typeof genresResult === 'string') {
@@ -22,16 +21,15 @@ export class MoviesController {
 
     const movies = await this.getAllMoviesUseCase.execute({ genres })
     if (!movies || movies.length === 0) return res.status(404).json({ message: 'Movies not found' })
-    res.status(200).json(movies)
+    res.status(200).json(MoviePresenter.toHttpList(movies))
   }
 
   getById = async (req, res, next) => {
     const { id } = req.params
-    const resultQuery = await this.getMovieUseCase.execute(id)
-    if (!resultQuery || resultQuery.length === 0) return res.status(404).json({ message: 'Movie not found' })
-    const movie = resultQuery[0]
+    const movie = await this.getMovieUseCase.execute(id)
+    if (!movie || movie.length === 0) return res.status(404).json({ message: 'Movie not found' })
 
-    return res.status(200).json(movie)
+    return res.status(200).json(MoviePresenter.toHttp(movie))
   }
 
   create = async (req, res, next) => {
@@ -43,7 +41,7 @@ export class MoviesController {
     try {
       const movieResult = await this.createMovieUseCase.execute({ title, year, director, duration, poster, rate, genres })
       if (!movieResult || movieResult.length === 0) return res.status(404).json({ message: 'createMoviesUseCase returned null or empty array' })
-      return res.status(201).json(movieResult)
+      return res.status(201).json(MoviePresenter.toHttp(movieResult))
     } catch (error) {
       return res.status(409).json({ error: error.message })
     }
@@ -58,7 +56,7 @@ export class MoviesController {
     try {
       const updateInput = result.data
       const updatedMovie = await this.updateMovieUseCase.execute({ id, input: updateInput })
-      return res.status(200).json(updatedMovie)
+      return res.status(200).json(MoviePresenter.toHttp(updatedMovie))
     } catch (error) {
       console.error('Error updating movie with the provided id')
       return res.status(404).json(error.message)
@@ -69,7 +67,7 @@ export class MoviesController {
     const { id } = req.params
     try {
       await this.deleteMovieUseCase.execute({ id })
-      return res.status(204)
+      return res.sendStatus(204)
     } catch (error) {
       return res.status(404).json({ message: `Movie with id ${id} was not found` })
     }
