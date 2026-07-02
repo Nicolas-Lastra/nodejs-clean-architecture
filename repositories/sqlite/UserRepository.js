@@ -61,13 +61,16 @@ export class UserRepository extends UserRepositoryInterface {
   }
 
   async save (user) {
-    const userData = UserMapper.toPersistance(user)
-    const { id, username, passwordHash, email } = userData
+    const userData = UserMapper.toPersistence(user)
+    const { id, username, password_hash: passwordHash, email } = userData
     await db.execute({
       sql: `INSERT INTO users (id, username, password_hash, email)
         VALUES (?, ?, ?, ?);
       `,
       args: [id, username, passwordHash, email]
     })
+
+    const createdUser = this.findById(id)
+    return createdUser ?? null
   }
 }
