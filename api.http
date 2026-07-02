@@ -58,7 +58,7 @@ Content-Type: application/json
 }
 
 ### Update movie
-PATCH http://localhost:1234/movies/7ddccb19-ade3-4fdb-9f94-128371ca5065
+PATCH http://localhost:1234/movies/0695db17-47ec-11f1-b23d-000e0986bd5b
 Content-Type: application/json
 
 {
@@ -71,4 +71,4 @@ Content-Type: application/json
 }
 
 ### Delete movie
-DELETE http://localhost:1234/movies/d866cc04-3d27-48b6-bc63-a896c8a11b9d
+DELETE http://localhost:1234/movies/0695db17-47ec-11f1-b23d-000e0986bd5b
