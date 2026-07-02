@@ -1,3 +1,4 @@
+import { MovieMapper } from '../../mappers/MovieMapper.js'
 import { MoviesRepositoryInterface } from '../../contracts/MoviesRepositoryInterface.js'
 import { createClient } from '@libsql/client'
 
@@ -31,7 +32,7 @@ export class MoviesRepository extends MoviesRepositoryInterface {
           director TEXT NOT NULL,
           duration INTEGER NOT NULL,
           poster TEXT,
-          rate REAL NOT NULL CHECK (rate >= 0 AND rate <= 10.0)
+          rate REAL CHECK (rate >= 0 AND rate <= 10.0)
         );`
       },
       { sql: 'DROP TABLE IF EXISTS genres;' },
@@ -91,10 +92,30 @@ export class MoviesRepository extends MoviesRepositoryInterface {
     if (genres) {
       let query = ''
       const queryArgs = []
-      const baseQuery = `SELECT m.id, m.title, m.year, m.director, m.duration, m.poster, m.rate
+      const baseQuery = `
+      SELECT
+          m.id,
+          m.title,
+          m.year,
+          m.director,
+          m.duration,
+          m.poster,
+          m.rate,
+          GROUP_CONCAT(g.name, ',') AS genres
       FROM movies m
-      JOIN movies_genres mg
-      ON m.id = mg.movie_id AND mg.genre_id = (SELECT id FROM genres WHERE LOWER(name) = ?)`
+      LEFT JOIN movies_genres mg
+      ON m.id = mg.movie_id
+      LEFT JOIN genres g
+      ON mg.genre_id = g.id
+      WHERE EXISTS (
+          SELECT 1
+          FROM movies_genres mg2
+          JOIN genres g2
+          ON mg2.genre_id = g2.id
+          WHERE mg2.movie_id = m.id AND LOWER(g2.name) = ?
+      )
+      GROUP BY m.id
+      `
 
       genres.forEach(genre => {
         query += baseQuery
@@ -102,48 +123,101 @@ export class MoviesRepository extends MoviesRepositoryInterface {
         queryArgs.push(genre.toLowerCase())
       })
 
-      const interQuery = query.trimEnd()
-      const finalQuery = interQuery.replace(/\s+\S+$/, ';')
+      query = query.trimEnd()
+      query = query.replace(/\s+\S+$/, ';')
 
-      const moviesWithGenresResult = await db.execute({
-        sql: finalQuery,
+      const moviesWithGenresFilterResult = await db.execute({
+        sql: query,
         args: queryArgs
       })
 
-      const moviesWithGenres = moviesWithGenresResult.rows
-      return moviesWithGenres
+      const moviesWithGenresFilter = moviesWithGenresFilterResult.rows
+      return moviesWithGenresFilter.map(movie => MovieMapper.toDomain(movie))
     }
 
     const queryResult = await db.execute({
-      sql: 'SELECT * FROM movies'
+      sql: `
+      SELECT
+        m.id,
+        m.title,
+        m.year,
+        m.director,
+        m.duration,
+        m.poster,
+        m.rate,
+        GROUP_CONCAT(g.name, ',') AS genres
+      FROM movies m
+      LEFT JOIN movies_genres mg
+      ON m.id = mg.movie_id
+      LEFT JOIN genres g
+      ON mg.genre_id = g.id
+      GROUP BY m.id;
+      `
     })
 
-    const movies = queryResult.rows
+    const moviesResult = queryResult.rows
+    const movies = moviesResult.map(movie => MovieMapper.toDomain(movie))
     return movies
   }
 
   async getById (id) {
     const movieResult = await db.execute({
-      sql: 'SELECT * FROM movies WHERE id = ?;',
+      sql: `
+      SELECT
+        m.id,
+        m.title,
+        m.year,
+        m.director,
+        m.duration,
+        m.poster,
+        m.rate,
+        GROUP_CONCAT(g.name, ',') AS genres
+      FROM movies m
+      LEFT JOIN movies_genres mg
+      ON m.id = mg.movie_id
+      LEFT JOIN genres g
+      ON mg.genre_id = g.id
+      WHERE m.id = ?
+      GROUP BY m.id;
+    `,
       args: [id]
     })
 
-    const movie = movieResult.rows
+    const movie = MovieMapper.toDomain(movieResult.rows[0])
     return movie
   }
 
   async getByTitle (title) {
     const movieResult = await db.execute({
-      sql: 'SELECT * FROM movies WHERE title = ?;',
+      sql: `
+      SELECT
+        m.id,
+        m.title,
+        m.year,
+        m.director,
+        m.duration,
+        m.poster,
+        m.rate,
+        GROUP_CONCAT(g.name, ',') AS genres
+      FROM movies m
+      LEFT JOIN movies_genres mg
+      ON m.id = mg.movie_id
+      LEFT JOIN genres g
+      ON mg.genre_id = g.id
+      WHERE m.title = ?
+      GROUP BY m.id;
+    `,
       args: [title]
     })
 
-    const movie = movieResult.rows
+    const movie = MovieMapper.toDomain(movieResult.rows[0])
     return movie
   }
 
-  async create (movie, genres) {
-    const { id, title, year, director, duration, poster, rate } = movie.toPrimitives()
+  async create (movie) {
+    const movieData = MovieMapper.toPersistence(movie)
+    const { id, title, year, director, duration, poster, rate } = movieData.movie
+    const genres = movieData.genres
 
     // Insert movie in movies table
     await db.execute({
@@ -152,122 +226,81 @@ export class MoviesRepository extends MoviesRepositoryInterface {
       args: [id, title, year, director, duration, poster, rate]
     })
 
-    // Return created movie from database
-    const createdMovie = await db.execute({
-      sql: 'SELECT * FROM movies WHERE id = ?;',
-      args: [id]
-    })
-    if (!createdMovie) throw new Error('Error obtaining created movie from the database')
-
     // Genres assignment
-    const baseQUery = `INSERT INTO movies_genres (movie_id, genre_id)
+    const genresArgs = []
+    let query = `INSERT INTO movies_genres (movie_id, genre_id)
     VALUES
     `
-    const genresArgs = []
-    let query = ''
-    query += baseQUery
 
     if (genres) {
       genres.forEach(genre => {
         query += '(?, (SELECT id FROM genres WHERE name = ?)),\n'
-        genresArgs.push(id)
-        genresArgs.push(genre)
+        genresArgs.push(id, genre)
       })
-      const interQuery = query.trimEnd()
-      const finalQuery = interQuery.replace(/.$/, ';')
+      query = query.trimEnd()
+      query = query.replace(/.$/, ';')
 
       await db.execute({
-        sql: finalQuery,
+        sql: query,
         args: genresArgs
       })
-
-      return { ...createdMovie.rows[0], genres }
     }
 
-    return { ...createdMovie.rows[0], genres: [] }
+    // Return created movie from database
+    const createdMovie = await this.getById(id)
+    if (!createdMovie) throw new Error('Error obtaining created movie from the database')
+    return createdMovie // this.getById() ya retorna una instancia de Movie
   }
 
   async update (id, input) {
+    const { movieFields, hasGenres, genres } = MovieMapper.toPersistenceUpdate(input)
     const statements = [] // For transaction (BEGIN TRANSACTION; ...; COMMIT;)
+    const movieEntries = Object.entries(movieFields)
 
-    let query = 'UPDATE movies SET'
-    const queryArgs = []
+    if (movieEntries.length > 0) {
+      const setClause = movieEntries
+        .map(([column]) => `${column} = ?`)
+        .join(', ')
 
-    for (const [key, value] of Object.entries(input)) {
-      if (key === 'title') query += ' title = ?,'
-      if (key === 'year') query += ' year = ?,'
-      if (key === 'director') query += ' director = ?,'
-      if (key === 'duration') query += ' duration = ?,'
-      if (key === 'poster') query += ' poster = ?,'
-      if (key === 'rate') query += ' rate = ?,'
+      const args = movieEntries.map(([, value]) => value)
 
-      if (key !== 'genres') {
-        queryArgs.push(value)
-      }
+      statements.push({
+        sql: `UPDATE movies SET ${setClause} WHERE id = ?;`,
+        args: [...args, id]
+      })
     }
 
-    queryArgs.push(id)
-    const interQuery = query.replace(/.$/, '')
-    const finalQuery = interQuery + '\n' + 'WHERE id = ?;'
-
-    statements.push({
-      sql: finalQuery,
-      args: queryArgs
-    })
-
-    // Genres assignment
-    if (Object.hasOwn(input, 'genres')) {
+    if (hasGenres) {
       statements.push({
         sql: 'DELETE FROM movies_genres WHERE movie_id = ?;',
         args: [id]
       })
 
-      const genres = input.genres
-      const genresArgs = []
+      if (genres.length > 0) {
+        let genresQuery = 'INSERT INTO movies_genres (movie_id, genre_id) VALUES '
+        const genresArgs = []
 
-      // let genresQuery = 'BEGIN TRANSACTION;\nDELETE FROM movies_genres WHERE movie_id = ?;\n'
-      let genresQuery = 'INSERT INTO movies_genres (movie_id, genre_id)\nVALUES\n'
+        genres.forEach(genre => {
+          genresQuery += '(?, (SELECT id FROM genres WHERE name = ?)), '
+          genresArgs.push(id, genre)
+        })
 
-      genres.forEach(genre => {
-        genresQuery += '(?, (SELECT id FROM genres WHERE name = ?)),\n'
-        genresArgs.push(id)
-        genresArgs.push(genre)
-      })
+        genresQuery = genresQuery.trimEnd()
+        genresQuery = genresQuery.replace(/.$/, ';')
 
-      const interGenresQuery = genresQuery.trimEnd()
-      const finalGenresQuery = interGenresQuery.replace(/.$/, ';')
-
-      statements.push({
-        sql: finalGenresQuery,
-        args: genresArgs
-      })
-    }
-
-    // Transaction
-    try {
-      await db.batch(statements, 'write')
-    } catch (error) {
-      console.error('Error updating movie genres. Transaction query not commited.')
-    }
-
-    // Return updated movie from database
-    try {
-      const updatedResult = await db.execute({
-        sql: 'SELECT * FROM movies WHERE id = ?;',
-        args: [id]
-      })
-
-      if (!updatedResult) throw new Error('Error obtaining updated movie from the database')
-      const updatedMovie = updatedResult.rows
-
-      if (Object.hasOwn(input, 'genres')) {
-        const genresInput = input.genres
-        return { ...updatedMovie, genresInput }
+        statements.push({
+          sql: genresQuery,
+          args: genresArgs
+        })
       }
-      return updatedMovie
-    } catch (error) {
-      console.error('Error returning updated movie from repository')
     }
+
+    if (statements.length > 0) {
+      await db.batch(statements, 'write')
+    }
+
+    const updatedMovie = await this.getById(id)
+    return updatedMovie
   }
 
   async delete (id) {
