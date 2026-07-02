@@ -1,4 +1,5 @@
 import { validatePartialUser, validateUser } from '../schemas/User.js'
+import { UserPresenter } from '../presenters/UserPresenter.js'
 
 export class AuthController {
   constructor ({ registerUserUseCase, loginUserUseCase }) {
@@ -13,7 +14,7 @@ export class AuthController {
     }
     try {
       const user = await this.registerUserUseCase.execute(validatedUser.data)
-      res.status(201).json({ user })
+      res.status(201).json(UserPresenter.toHttp(user))
     } catch (error) {
       next(error)
     }
@@ -34,8 +35,11 @@ export class AuthController {
           sameSite: 'strict',
           maxAge: 1000 * 60 * 60
         })
-        .json({ user })
+        .json(UserPresenter.toHttp(user))
     } catch (error) {
+      if (error.message === 'Invalid credentials') {
+        return res.status(404).json({ error: 'Invalid Credentials' })
+      }
       next(error)
     }
   }
