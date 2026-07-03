@@ -1,4 +1,4 @@
-import { User } from '../../models/User.js'
+import { User } from '../../entities/User.js'
 
 export class RegisterUserUseCase {
   constructor ({ userRepository, idGenerator, passwordHasher }) {

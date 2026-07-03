@@ -1,4 +1,4 @@
-import { Movie } from '../../models/Movie.js'
+import { Movie } from '../../entities/Movie.js'
 
 export class CreateMovieUseCase {
   constructor ({ moviesRepository, idGenerator }) {
