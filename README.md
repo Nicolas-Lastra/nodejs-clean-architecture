@@ -57,7 +57,7 @@ export class User {
     return this.#email
   }
 
-  // Métodos o funciones
+  // Métodos
   toPrimitives () {
     return {
       id: this.#id,
@@ -86,7 +86,7 @@ Los casos de uso dependen directamente de las entidades, pero también deben int
 En el código a continuación tenemos las siguientes abstracciones: userRepository, idGenerator y passwordHasher. El caso de uso importa directamente la entidad (User) y recibe por parámetros (a través del constructor) los adaptadores de interface. Es común que los casos de uso se diseñen para una sola tarea, por eso tiene solo una función llamada execute.
 
 ```javascript
-import { User } from '../../models/User.js'
+import { User } from '../../entities/User.js'
 
 export class RegisterUserUseCase {
   constructor ({ userRepository, idGenerator, passwordHasher }) {
@@ -109,9 +109,9 @@ export class RegisterUserUseCase {
       email
     })
 
-    await this.userRepository.save(newUser)
+    const createdUser = await this.userRepository.save(newUser)
 
-    return newUser.toPublicData()
+    return createdUser
   }
 }
 ```
@@ -121,16 +121,18 @@ Como se puede ver en el código anterior, el caso de uso crea una instancia de l
 Son un conjunto de adaptadores que convierten los datos desde el formato más conveniente para los casos de uso y entidades, hacia el formato más conveniente para una agencia externa como bases de datos o frameworks web. En esta capa existe toda la arquitectura MVC (Presenters, Views, Controllers). Los modelos solo son estructuras de datos enviadas desde los controladores a los casos de uso, luego son enviados de vuelta desde los casos de uso hacia los presentadores y vistas.
 
 - **Modelos**: Los modelos o "Data Transfer Objects" (DTO) no son lo mismo que una entidad, son una representación de esta para distintos usos. Estrictamente corresponden a estructuras de datos usados para transferir información entre componentes. Los modelos pueden ser de solicitud (objeto transferido del controlador al caso de uso), de respuesta (objeto transferido del caso de uso al presentador) o de vista (objeto que contiene la data exacta que necesita la vista).
+- **Mappers**: Son funciones u objetos encargados de transformar datos entre distintas representaciones. Su objetivo es evitar que las capas internas conozcan detalles de persistencia o presentación, y se encargan de la creación de los DTOs y las entidades.
 - **Vista**: Manejan la presentación de los datos. Representa todo lo que el usuario ve y con lo cual interactua.
 - **Controladores**: Manejan el flujo de entrada. Toman las acciones de usuarios desde la vista, los empaquetan y envían hacia los casos de uso.
 - **Presentadores**: Manejan el flujo de salida. Obtienen la respuesta desde los casos de uso, la procesan y la envían de vuelta a la vista.
 - **Repositorios/Gateaways**: Se encargan específicamente de la persistencia de los datos. Convierten entidades a registros en la base de datos y viceversa. Implementan las interfaces de las cuales dependen los casos de uso.
 
-En este repositorio los presentadores se fusionan con los controladores, por lo que el manejo de datos tanto de entrada como de salida en esta capa será a través de controladores. La carpeta models contiene a las entidades, la estructura de datos para cada entidad es manejada por los controladores y repositorios (JSON). Siendo estrictos con la arquitectura limpia, debiera agregarse un mapeo entre los DTO y las entidades (algo como UserToDto o DtoToUser), pero por ahora se ha evitado por simplicidad (se evaluará agregarlo en futuras actualizaciones).
+En este repositorio los presentadores se se simplifican para dedicarse solo a formatear la respuesta de salida (de entidad a respuesta http), por lo que el manejo de datos tanto de entrada como de salida en esta capa será a través de controladores, lo cual es una práctica común para proyectos pequeños/medianos realizados con Express. Si la estructura de salida de tu proyecto es más compleja, considera crear un presentador separado que maneje distintas respuestas según tipo de cliente, HTML además de JSON, muchas transformaciones repetidas, etc.
 
 ```javascript
 // Ejemplo AuthController
 import { validatePartialUser, validateUser } from '../schemas/User.js'
+import { UserPresenter } from '../presenters/UserPresenter.js'
 
 export class AuthController {
   constructor ({ registerUserUseCase, loginUserUseCase }) {
@@ -145,7 +147,7 @@ export class AuthController {
     }
     try {
       const user = await this.registerUserUseCase.execute(validatedUser.data)
-      res.status(201).json({ user })
+      res.status(201).json(UserPresenter.toHttp(user))
     } catch (error) {
       next(error)
     }
@@ -166,8 +168,11 @@ export class AuthController {
           sameSite: 'strict',
           maxAge: 1000 * 60 * 60
         })
-        .json({ user })
+        .json(UserPresenter.toHttp(user))
     } catch (error) {
+      if (error.message === 'Invalid credentials') {
+        return res.status(404).json({ error: 'Invalid Credentials' })
+      }
       next(error)
     }
   }
@@ -183,6 +188,16 @@ export class AuthController {
   }
 }
 
+```
+
+Aquí puede verse la utilidad de los presentadores, toman las entidades provenientes de los casos de uso y la transforman a un formato conveniente para dar una respuesta HTTP (toHttp()).
+
+```javascript
+export const UserPresenter = {
+  toHttp (user) {
+    return user.toPublicData()
+  }
+}
 ```
 
 En el código anterior podemos ver que el controlador se encarga de procesar las solicitudes y respuestas HTTP (req, res), su labor es traducir lo que recibe del mundo exterior, traducirlo para las capas internas y viceversa. Aquí viven las validaciones de esquemas, respuestas con códigos de estado HTTP, solicitud de cookies y sesiones.
@@ -207,7 +222,116 @@ export class UserRepository {
   }
 }
 ```
-JavaScript no tiene funcionalidades como las de Java u otros lenguajes para definir interfaces, los cuales arrojan errores si los contratos no están debidamente implementados. En JavaScript se puede simular este comportamiento a través de clases base que contienen especificaciones sin implementación. A partir de este contrato se crearan clases específicas que extiendan/implementen la interfaz/contrato en la capa de Frameworks & Drivers, y hagan implementaciones concretas en el código, como por ejemplo, consultas SQL.
+JavaScript no tiene funcionalidades como las de Java u otros lenguajes para definir interfaces, los cuales arrojan errores si los contratos no están debidamente implementados. En JavaScript se puede simular este comportamiento a través de clases base que contienen especificaciones sin implementación. A partir de este contrato se crearan clases específicas que extiendan/implementen la interfaz/contrato en la capa de Frameworks & Drivers, y hagan implementaciones concretas en el código, como por ejemplo, consultas SQL. La implementación concreta queda como se muestra a continuación.
+
+```javascript
+import { UserRepositoryInterface } from '../../contracts/UserRepositoryInterface.js' // Interfaz: contrato que deben seguir los repositorios
+import { UserMapper } from '../../mappers/UserMapper.js'
+import { createClient } from '@libsql/client'
+
+// local file db
+const db = createClient({
+  url: 'file:sqlite-db.db'
+})
+
+// Para conectar con base de datos hosteada en Turso
+// Comentar local file db y descomentar lo debajo de turso db
+
+// turso db
+// const db = createClient({
+//   url: process.env.DB_URL,
+//   authToken: process.env.DB_TOKEN
+// })
+
+// Recuerda crear el archivo .env en la raíz del proyecto
+
+export class UserRepository extends UserRepositoryInterface {
+  async init () {
+    await db.batch([
+      { sql: 'DROP TABLE IF EXISTS users;' },
+      {
+        sql: `
+        CREATE TABLE users (
+          id TEXT PRIMARY KEY,
+          username TEXT NOT NULL UNIQUE,
+          password_hash TEXT NOT NULL,
+          email TEXT NOT NULL UNIQUE
+        );
+      `
+      },
+      {
+        sql: `INSERT INTO users (id, username, password_hash, email) 
+        VALUES
+        ('cd8b4fb4-6377-457a-800e-ff5d7a26e8bc' , 'usuario_prueba', '$2b$10$ZhMIBnpjNa71JqF840N5x.jhVHB8ot0ptsbTELPLZj9rcbIlIsgcO', 'usuario@prueba.com');`
+      }
+    ], 'write')
+  }
+
+  async findById (id) {
+    const result = await db.execute({
+      sql: 'SELECT * FROM users WHERE id = ?;',
+      args: [id]
+    })
+
+    const user = UserMapper.toDomain(result.rows[0])
+    return user ?? null
+  }
+
+  async findByUsername (username) {
+    const result = await db.execute({
+      sql: 'SELECT * FROM users WHERE username = ?;',
+      args: [username]
+    })
+
+    const user = UserMapper.toDomain(result.rows[0])
+    return user ?? null
+  }
+
+  async save (user) {
+    const userData = UserMapper.toPersistence(user)
+    const { id, username, password_hash: passwordHash, email } = userData
+    await db.execute({
+      sql: `INSERT INTO users (id, username, password_hash, email)
+        VALUES (?, ?, ?, ?);
+      `,
+      args: [id, username, passwordHash, email]
+    })
+
+    const createdUser = this.findById(id)
+    return createdUser ?? null
+  }
+}
+
+```
+
+Aquí puede notarse la utilidad de los mappers, transforman los resultados de las consultas a la base de datos hacia entidades (toDomain()) y de entidades hacia modelos que pueden utilizarse para hacer consultas a la base de datos (toPersistence()).
+
+```javascript
+import { User } from '../entities/User.js'
+
+export const UserMapper = {
+  toDomain (row) {
+    if (!row) return null
+
+    return new User({
+      id: row.id,
+      username: row.username,
+      passwordHash: row.password_hash,
+      email: row.email
+    })
+  },
+
+  toPersistence (user) {
+    const userData = user.toPrimitives()
+    return {
+      id: userData.id,
+      username: userData.username,
+      password_hash: userData.passwordHash,
+      email: userData.email
+    }
+  }
+}
+```
 
 #### Frameworks & Drivers
 Es la capa más externa, incluye todas las herramientas externas y detalles técnicos, como la base de datos, framework web, APIs de terceros e interfaz de usuario.
@@ -226,8 +350,8 @@ import 'dotenv/config'
 import { createAuthMiddleware } from './middlewares/authMiddleware.js'
 import { createAuthRouter } from './routes/auth.routes.js'
 import { AuthController } from './controllers/AuthController.js'
-import { RegisterUserUseCase } from './services/auth/RegisterUserUseCase.js'
-import { LoginUserUseCase } from './services/auth/LoginUserUseCase.js'
+import { RegisterUserUseCase } from './use-cases/auth/RegisterUserUseCase.js'
+import { LoginUserUseCase } from './use-cases/auth/LoginUserUseCase.js'
 import { IdGenerator } from './utils/IdGenerator.js'
 import { PasswordHasher } from './utils/PasswordHasher.js'
 import { TokenService } from './utils/TokenService.js'
@@ -340,5 +464,7 @@ pnpm run start:sqlite
 
 ## Otros
 Este repositorio fue creado para ejecutarse son una base de datos [Turso](https://turso.tech/) o una base de datos local con SQLite. Para agregar otra base de datos u otro lenguaje, replicar lo realizado con los repositorios de este proyecto y crear un archivo .env basado en [example.env](example.env).
+
+Para utilizar el archivo api.http se recomienda utilizar la extensión [REST CLient](https://marketplace.visualstudio.com/items?itemName=humao.rest-client) de Huachao Mao.
 
 Por un problema de compatibilidad entre la versión 10 o superior de pnpm y la extensión ESLint (microsoft) en Visual Studio Code, se agrega un archivo [.npmrc](.npmrc) para arreglar este problema. Esto puede no ser necesario en tu caso, pero si presentas errores de eslinter considera dejarlo.
