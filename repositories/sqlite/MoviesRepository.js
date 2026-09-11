@@ -65,12 +65,32 @@ export class MoviesRepository extends MoviesRepositoryInterface {
       {
         sql: `
         INSERT INTO genres (name) VALUES
-        ('Drama'),
         ('Action'),
-        ('Crime'),
         ('Adventure'),
+        ('Comedy'),
+        ('Crime'),
+        ('Drama'),
+        ('Fantasy'),
+        ('Horror'),
+        ('Thriller'),
         ('Sci-Fi'),
-        ('Romance');
+        ('Romance'),
+        ('Biography'),
+        ('Music'),
+        ('Gangster Movies'),
+        ('ClassicScifi'),
+        ('Family'),
+        ('Sport'),
+        ('romcom'),
+        ('Disaster Movies'),
+        ('Dog Movies'),
+        ('History'),
+        ('Sports films'),
+        ('animation'),
+        ('martial arts'),
+        ('war'),
+        ('Mystery'),
+        ('Documentary');
         `
       },
       {

@@ -8,10 +8,37 @@ const movieSchema = z.object({
   year: z.number().int().positive().min(1900).max(2026),
   director: z.string(),
   duration: z.number().int().positive(),
-  poster: z.string().url({ message: 'Poster must be a valid URL' }),
+  poster: z.url({ message: 'Poster must be a valid URL' }),
   rate: z.number().min(0).max(10),
   genres: z.array(
-    z.enum(['Action', 'Adventure', 'Comedy', 'Crime', 'Drama', 'Fantasy', 'Horror', 'Thriller', 'Sci-Fi', 'Romance']))
+    z.enum([
+      'Action',
+      'Adventure',
+      'Comedy',
+      'Crime',
+      'Drama',
+      'Fantasy',
+      'Horror',
+      'Thriller',
+      'Sci-Fi',
+      'Romance',
+      'Biography',
+      'Music',
+      'Gangster Movies',
+      'ClassicScifi',
+      'Family',
+      'Sport',
+      'romcom',
+      'Disaster Movies',
+      'Dog Movies',
+      'History',
+      'Sports films',
+      'animation',
+      'martial arts',
+      'war',
+      'Mystery',
+      'Documentary'
+    ]))
     .optional()
 })
 
