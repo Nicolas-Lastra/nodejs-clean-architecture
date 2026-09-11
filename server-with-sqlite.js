@@ -4,10 +4,11 @@ import { UserRepository } from './repositories/sqlite/UserRepository.js'
 import 'dotenv/config'
 
 const userRepository = new UserRepository()
-await userRepository.init()
-
 const moviesRepository = new MoviesRepository()
-await moviesRepository.init()
+
+// Descomentar para forzar el inicio por defecto
+// await userRepository.init()
+// await moviesRepository.init()
 
 const app = createApp({ userRepository, moviesRepository })
 
