@@ -6,9 +6,11 @@ import 'dotenv/config'
 const userRepository = new UserRepository()
 const moviesRepository = new MoviesRepository()
 
-// Descomentar para forzar el inicio por defecto
-// await userRepository.init()
-// await moviesRepository.init()
+// Forzar iniciación en desarrollo
+if (process.env.NODE_ENV === 'development') {
+  await userRepository.init()
+  await moviesRepository.init()
+}
 
 const app = createApp({ userRepository, moviesRepository })
 
