@@ -1,6 +1,7 @@
 import { UserRepositoryInterface } from '../../contracts/UserRepositoryInterface.js' // Interfaz: contrato que deben seguir los repositorios
 import { UserMapper } from '../../mappers/UserMapper.js'
 import { createClient } from '@libsql/client'
+import { insertIntoUsers } from './repository-init.js'
 
 // local file db
 const db = createClient({
@@ -33,9 +34,7 @@ export class UserRepository extends UserRepositoryInterface {
       `
       },
       {
-        sql: `INSERT INTO users (id, username, password_hash, email) 
-        VALUES
-        ('cd8b4fb4-6377-457a-800e-ff5d7a26e8bc' , 'usuario_prueba', '$2b$10$ZhMIBnpjNa71JqF840N5x.jhVHB8ot0ptsbTELPLZj9rcbIlIsgcO', 'usuario@prueba.com');`
+        sql: insertIntoUsers
       }
     ], 'write')
   }
