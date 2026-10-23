@@ -1,4 +1,5 @@
 import z from 'zod'
+import { MOVIE_GENRES } from '../entities/MovieGenres.js'
 
 const movieSchema = z.object({
   title: z.string({
@@ -10,34 +11,7 @@ const movieSchema = z.object({
   duration: z.number().int().positive(),
   poster: z.url({ message: 'Poster must be a valid URL' }),
   rate: z.number().min(0).max(10),
-  genres: z.array(
-    z.enum([
-      'Action',
-      'Adventure',
-      'Comedy',
-      'Crime',
-      'Drama',
-      'Fantasy',
-      'Horror',
-      'Thriller',
-      'Sci-Fi',
-      'Romance',
-      'Biography',
-      'Music',
-      'Gangster-Movies',
-      'Family',
-      'Sport',
-      'Rom-Com',
-      'Disaster-Movies',
-      'Dog-Movies',
-      'History',
-      'Animation',
-      'Martial-Arts',
-      'War',
-      'Mystery',
-      'Documentary'
-    ]))
-    .optional()
+  genres: z.array(z.enum(MOVIE_GENRES)).optional()
 })
 
 export function validateMovie (input) {
