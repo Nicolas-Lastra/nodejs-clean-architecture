@@ -3,15 +3,10 @@ import cookieParser from 'cookie-parser'
 import 'dotenv/config'
 
 // Auth
-import { createAuthMiddleware } from './middlewares/authMiddleware.js'
 import { createAuthRouter } from './routes/auth.routes.js'
 import { AuthController } from './controllers/AuthController.js'
 import { RegisterUserUseCase } from './use-cases/auth/RegisterUserUseCase.js'
 import { LoginUserUseCase } from './use-cases/auth/LoginUserUseCase.js'
-import { IdGenerator } from './utils/IdGenerator.js'
-import { PasswordHasher } from './utils/PasswordHasher.js'
-import { TokenService } from './utils/TokenService.js'
-import { corsMiddleware } from './middlewares/corsMiddleware.js'
 
 // Movies
 import { GetAllMoviesUseCase } from './use-cases/movies/GetAllMoviesUseCase.js'
@@ -21,6 +16,16 @@ import { UpdateMovieUseCase } from './use-cases/movies/UpdateMovieUseCase.js'
 import { DeleteMovieUseCase } from './use-cases/movies/DeleteMovieUseCase.js'
 import { MoviesController } from './controllers/MoviesController.js'
 import { createsMovieRouter } from './routes/movies.routes.js'
+
+// Utils
+import { IdGenerator } from './utils/IdGenerator.js'
+import { PasswordHasher } from './utils/PasswordHasher.js'
+import { TokenService } from './utils/TokenService.js'
+
+// Middlewares
+import { createAuthMiddleware } from './middlewares/authMiddleware.js'
+import { corsMiddleware } from './middlewares/corsMiddleware.js'
+import { errorMiddleware } from './middlewares/errorMiddleware.js'
 
 export const createApp = ({ userRepository, moviesRepository }) => {
   const app = express()
@@ -65,6 +70,7 @@ export const createApp = ({ userRepository, moviesRepository }) => {
 
   app.use('/auth', authRouter)
   app.use('/movies', moviesRouter)
+  app.use(errorMiddleware)
 
   return app
 }
