@@ -163,8 +163,7 @@ export class MoviesRepository extends MoviesRepositoryInterface {
       args: [id]
     })
 
-    const movie = MovieMapper.toDomain(movieResult.rows[0])
-    return movie
+    return MovieMapper.toDomain(movieResult.rows[0])
   }
 
   async getByTitle (title) {
